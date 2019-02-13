@@ -1,88 +1,17 @@
 @objc(RFIDPlugin) class RFIDPlugin : CDVPlugin {
     
     var commander: TSLAsciiCommander = TSLAsciiCommander()
-    
-    @objc(echo:)
-    func echo(command: CDVInvokedUrlCommand) {
-        var pluginResult = CDVPluginResult(
-            status: CDVCommandStatus_ERROR
-        )
-        
-        let msg = command.arguments[0] as? String ?? ""
-        
-        if msg.characters.count > 0 {
-            let toastController: UIAlertController =
-                UIAlertController(
-                    title: "",
-                    message: msg,
-                    preferredStyle: .alert
-            )
-            
-            self.viewController?.present(
-                toastController,
-                animated: true,
-                completion: nil
-            )
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                toastController.dismiss(
-                    animated: true,
-                    completion: nil
-                )
-            }
-            
-            pluginResult = CDVPluginResult(
-                status: CDVCommandStatus_OK,
-                messageAs: msg
-            )
-        }
-        
-        self.commandDelegate!.send(
-            pluginResult,
-            callbackId: command.callbackId
-        )
-    }
+    var inventaryCommand = TSLInventoryCommand()
     
     @objc(initPlugin:)
     func initPlugin(command: CDVInvokedUrlCommand) {
+        
+        commander = TSLAsciiCommander()
         commander.addSynchronousResponder()
         
-        NotificationCenter.default.addObserver(self, selector: #selector(self.commanderChangedState(_:)), name: NSNotification.Name.TSLCommanderStateChanged, object: commander)
+        commander.connect(nil)
         
-    }
-    
-    func initConnectedReader(isConnected: Bool) {
-        if isConnected {
-            let resetCommand = TSLFactoryDefaultsCommand.synchronousCommand()
-            commander.execute(resetCommand)
-            
-            if resetCommand?.isSuccessful ?? false {
-                print("Reader reset to Factory Defaults")
-            } else {
-                print("Unable to reset reader to Factory Defaults")
-            }
-            
-            let versionCommand = TSLVersionInformationCommand.synchronousCommand()
-            commander.execute(versionCommand)
-            
-            let batteryStatus = TSLBatteryStatusCommand.synchronousCommand()
-            commander.execute(batteryStatus)
-            
-            let alert = UIAlertView(title: "Manufacturer: \(versionCommand?.manufacturer)\nSerial Number: \(versionCommand?.serialNumber)\nFirmware: \(versionCommand?.firmwareVersion)\nASCII Protocol: \(versionCommand?.asciiProtocol)\nBattery Level: \(batteryStatus?.batteryLevel)", message: "", delegate: nil, cancelButtonTitle: "OK")
-            alert.show()
-            
-        } else {
-            
-        }
-        
-    }
-    
-    
-    
-    @objc(getDevices:)
-    func getDevices(command: CDVInvokedUrlCommand) {
-        
-        commander.addSynchronousResponder()
+        EAAccessoryManager.shared().registerForLocalNotifications()
         
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(deviceConnected(_ :)),
@@ -94,7 +23,11 @@
                                                name: NSNotification.Name.EAAccessoryDidDisconnect,
                                                object: nil)
         
-        EAAccessoryManager.shared().registerForLocalNotifications()
+    }
+    
+    
+    @objc(getDevices:)
+    func getDevices(command: CDVInvokedUrlCommand) {
         
         EAAccessoryManager.shared().showBluetoothAccessoryPicker(withNameFilter: nil) { error in
             if error == nil {
@@ -121,19 +54,14 @@
                 }
             }
         }
-        
-    }
-    
-    @objc func commanderChangedState(_ notification: NSNotification) {
-        let isConnected = notification.userInfo != nil
-        
     }
     
     
     @objc func deviceConnected(_ notification: NSNotification) {
         
         if let accessory = notification.userInfo?[EAAccessoryKey] as? EAAccessory {
-            //            commander?.connect(accessory)
+            commander.connect(accessory)
+            //            commander.connectedAccessory = accessory
             let alert = UIAlertView(title: "Device \(accessory.name) Connected", message: nil, delegate: nil, cancelButtonTitle: "OK")
             alert.show()
             
@@ -166,7 +94,6 @@
     
     @objc(getConnectedDeviceData:)
     func getConnectedDeviceData(command: CDVInvokedUrlCommand) {
-        //        initScanner()
         let versionCommand = TSLVersionInformationCommand.synchronousCommand()
         let batteryStatus = TSLBatteryStatusCommand.synchronousCommand()
         
