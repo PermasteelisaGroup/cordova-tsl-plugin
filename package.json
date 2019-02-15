@@ -1,9 +1,9 @@
 {
-  "name": "com-rfid-plugins",
+  "name": "com-rfidplugin-plugin",
   "version": "0.0.1",
   "description": "",
   "cordova": {
-    "id": "com-rfid-plugins",
+    "id": "com-rfidplugin-plugin",
     "platforms": [
       "ios"
     ]
