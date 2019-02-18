@@ -17,14 +17,20 @@
         <framework src="src/ios/ExternalAccessory.framework" custom="true"/>
         <framework src="src/ios/TSLAsciiCommands.framework" custom="true"/>
         
-        <config-file target="*-Info.plist" parent="CFBundleURLTypes">
+<!--        <config-file target="*-Info.plist" parent="CFBundleURLTypes">-->
+<!--            <array>-->
+<!--                <dict>-->
+<!--                    <key>UISupportedExternalAccessoryProtocols</key>-->
+<!--                    <array>-->
+<!--                        <string>com.uk.tsf.rfid</string>-->
+<!--                    </array>-->
+<!--                </dict>-->
+<!--            </array>-->
+<!--        </config-file>-->
+
+        <config-file target="*-Info.plist" parent="UISupportedExternalAccessoryProtocols">
             <array>
-                <dict>
-                    <key>UISupportedExternalAccessoryProtocols</key>
-                    <array>
-                        <string>com.uk.tsf.rfid</string>
-                    </array>
-                </dict>
+                <string>com.uk.tsl.rfid</string>
             </array>
         </config-file>
         
