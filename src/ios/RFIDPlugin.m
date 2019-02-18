@@ -209,12 +209,7 @@
         TSLBatteryStatusCommand *batteryCommand = [TSLBatteryStatusCommand synchronousCommand];
         [_commander executeCommand:batteryCommand];
         
-        NSString *msg = [msg stringByAppendingFormat:@"\n%-16s %@\n%-16s %@\n%-16s %@\n%-16s %@\n%-16s %@\n\n",
-                         "Manufacturer:", versionCommand.manufacturer,
-                         "Serial Number:", versionCommand.serialNumber,
-                         "Firmware:", versionCommand.firmwareVersion,
-                         "ASCII Protocol:", versionCommand.asciiProtocol,
-                         "Battery Level:", [NSString stringWithFormat:@"%d%%", batteryCommand.batteryLevel]];
+        NSString *msg = [NSString stringWithFormat:@"Manufacturer: %@\nSerial Number: %@\nFirmware: %@\nBattery Level: %@", versionCommand.manufacturer, versionCommand.serialNumber, versionCommand.firmwareVersion, [NSString stringWithFormat:@"%d%%", batteryCommand.batteryLevel]];
         
         UIAlertView *alert = [[UIAlertView alloc] initWithTitle:msg                                 message:@""
                                                        delegate:nil
