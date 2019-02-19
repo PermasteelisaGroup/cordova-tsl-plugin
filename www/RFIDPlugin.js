@@ -19,3 +19,11 @@ exports.disconnectDevice = function(arg0, success, error) {
 exports.initPlugin = function(arg0, success, error) {
     exec(success, error, 'RFIDPlugin', 'initPlugin', [arg0]);
 };
+
+exports.scan = function(arg0, success, error) {
+    exec(success, error, 'RFIDPlugin', 'scan', [arg0]);
+};
+
+exports.scanAndRead = function(arg0, success, error) {
+    exec(success, error, 'RFIDPlugin', 'scanAndRead', [arg0]);
+};

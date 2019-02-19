@@ -64,160 +64,289 @@
 #import <TSLAsciiCommands/TSLTransponderReceivedDelegate.h>
 
 
-@interface RFIDPlugin () {
+@interface RFIDPlugin () <TSLInventoryCommandTransponderReceivedDelegate> {
     TSLAsciiCommander *_commander;
+    TSLInventoryCommand *_inventaryCommand;
+    
+    TSLReadTransponderCommand *_readerCommand;
+    
+    NSString *_connectCallbackId;
+    NSString *_disconnectCallbackId;
+    NSString *_scanCallbackId;
+    
 }
-    @end
+@end
 
 
 @implementation RFIDPlugin
+
+- (void)echo:(CDVInvokedUrlCommand*)command {
+    CDVPluginResult* pluginResult = nil;
+    NSString* msg = [command.arguments objectAtIndex:0];
     
-- (void)echo:(CDVInvokedUrlCommand*)command
-    {
-        CDVPluginResult* pluginResult = nil;
-        NSString* msg = [command.arguments objectAtIndex:0];
+    if (msg == nil || [msg length] == 0) {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
+    } else {
+        UIAlertView *toast = [
+                              [UIAlertView alloc] initWithTitle:@""
+                              message:msg
+                              delegate:nil
+                              cancelButtonTitle:nil
+                              otherButtonTitles:nil, nil];
         
-        if (msg == nil || [msg length] == 0) {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR];
-        } else {
-            UIAlertView *toast = [
-                                  [UIAlertView alloc] initWithTitle:@""
-                                  message:msg
-                                  delegate:nil
-                                  cancelButtonTitle:nil
-                                  otherButtonTitles:nil, nil];
-            
-            [toast show];
-            
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
-                           dispatch_get_main_queue(), ^{
-                               [toast dismissWithClickedButtonIndex:0 animated:YES];
-                           });
-            
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                             messageAsString:msg];
-        }
+        [toast show];
         
-        [self.commandDelegate sendPluginResult:pluginResult
-                                    callbackId:command.callbackId];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
+                       dispatch_get_main_queue(), ^{
+                           [toast dismissWithClickedButtonIndex:0 animated:YES];
+                       });
+        
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                         messageAsString:msg];
     }
     
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:command.callbackId];
+}
+
+
+- (void)initPlugin:(CDVInvokedUrlCommand*)command {
+    _commander = [[TSLAsciiCommander alloc] init];
+    // Some synchronous commands will be used in the app
+    [_commander addSynchronousResponder];
+    [_commander connect:nil];
     
-- (void)initPlugin:(CDVInvokedUrlCommand*)command
-    {
-        _commander = [[TSLAsciiCommander alloc] init];
-        // Some synchronous commands will be used in the app
-        [_commander addSynchronousResponder];
-        [_commander connect:nil];
-        
-        // Listen for accessory connect/disconnects
-        [[EAAccessoryManager sharedAccessoryManager] registerForLocalNotifications];
-        
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidConnect:) name:EAAccessoryDidConnectNotification object:nil];
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidDisconnect:) name:EAAccessoryDidDisconnectNotification object:nil];
-        
+    
+    // Listen for accessory connect/disconnects
+    [[EAAccessoryManager sharedAccessoryManager] registerForLocalNotifications];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidConnect:) name:EAAccessoryDidConnectNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidDisconnect:) name:EAAccessoryDidDisconnectNotification object:nil];
+    
+    
+    // Listen for change in TSLAsciiCommander state
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(commanderChangedState:) name:TSLCommanderStateChangedNotification object:_commander];
+    
+    
+    [self initConnectedReader:_commander.isConnected];
+    
+    CDVPluginResult* pluginResult = nil;
+    if (_commander.isConnected) {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                         messageAsString:@"Plugin ready, device is connected"];
+    } else {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                         messageAsString:@"Plugin ready, no connected device"];
     }
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:command.callbackId];
+}
+
+
+
+-(void)commanderChangedState:(NSNotification *)notification
+{
+    // The connected state is indicated by the presence or absence of userInfo
+    BOOL isConnected = notification.userInfo != nil;
     
-    
+    [self initConnectedReader: isConnected];
+}
+
+
 -(void) _accessoryDidConnect:(NSNotification *)notification {
     EAAccessory *connectedAccessory = [[notification userInfo] objectForKey:EAAccessoryKey];
     [_commander connect:connectedAccessory];
     
-    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Device Connected"
-                                                    message:@""
-                                                   delegate:nil
-                                          cancelButtonTitle:@"OK"
-                                          otherButtonTitles:nil
-                          ];
-    [alert show];
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                      messageAsString:@"Device Connected"];
+    
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:_connectCallbackId];
+    
     
 }
+
+- (void)_accessoryDidDisconnect:(NSNotification *)notification {
     
-- (void)_accessoryDidDisconnect:(NSNotification *)notification
-    {
-        EAAccessory *connectedAccessory = [[notification userInfo] objectForKey:EAAccessoryKey];
-        
-        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Device Disconnected"
-                                                        message:@""
-                                                       delegate:nil
-                                              cancelButtonTitle:@"OK"
-                                              otherButtonTitles:nil
-                              ];
-        [alert show];
-    }
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                      messageAsString:@"Device Disconnected"];
     
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:_disconnectCallbackId];
+}
+
+
+- (void)getDevices:(CDVInvokedUrlCommand*)command {
     
-- (void)getDevices:(CDVInvokedUrlCommand*)command
-    {
-        [[EAAccessoryManager sharedAccessoryManager] showBluetoothAccessoryPickerWithNameFilter:nil completion:^(NSError *error)
-         {
-             if( error == nil )
-             {
-                 // Inform the user that the device is being connected
-                 //             _hud = [TSLProgressHUD updateHUD:_hud inView:self.view forBusyState:YES withMessage:@"Waiting for device..."];
-             }
-             else
-             {
-                 NSString *errorMessage = nil;
-                 switch (error.code)
-                 {
-                     case EABluetoothAccessoryPickerAlreadyConnected:
-                     {
-                         NSLog(@"AlreadyConnected");
-                         errorMessage = @"That device is already paired!\n\nTry again and wait a few seconds before choosing. Already paired devices will disappear from the list!";
-                     }
-                     break;
-                     
-                     case EABluetoothAccessoryPickerResultFailed:
-                     case EABluetoothAccessoryPickerResultNotFound:
-                     NSLog(@"NotFound");
-                     errorMessage = @"Unable to find that device!\n\nEnsure the device is powered on and that the blue LED is flashing.";
-                     break;
-                     
-                     case EABluetoothAccessoryPickerResultCancelled:
-                     NSLog(@"Cancelled");
-                     break;
-                     
-                     default:
-                     break;
-                 }
-                 if( errorMessage )
-                 {
-                     UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Pairing failed..."
-                                                                     message:errorMessage
-                                                                    delegate:nil
-                                                           cancelButtonTitle:@"OK"
-                                                           otherButtonTitles:nil
-                                           ];
-                     [alert show];
-                 }
-             }
-         }];
-    }
-    
-- (void)disconnectDevice:(CDVInvokedUrlCommand*)command
-    {
-        if (_commander.isConnected) {
-            [_commander permanentlyDisconnect];
+    [[EAAccessoryManager sharedAccessoryManager] showBluetoothAccessoryPickerWithNameFilter:nil completion:^(NSError *error) {
+        if( error == nil )
+        {
+            // Inform the user that the device is being connected
+            //             _hud = [TSLProgressHUD updateHUD:_hud inView:self.view forBusyState:YES withMessage:@"Waiting for device..."];
+            
+            _connectCallbackId = command.callbackId;
+            
         }
+        else
+        {
+            NSString *errorMessage = nil;
+            switch (error.code)
+            {
+                case EABluetoothAccessoryPickerAlreadyConnected:
+                {
+                    NSLog(@"AlreadyConnected");
+                    errorMessage = @"That device is already paired!\n\nTry again and wait a few seconds before choosing. Already paired devices will disappear from the list!";
+                }
+                    break;
+                    
+                case EABluetoothAccessoryPickerResultFailed:
+                case EABluetoothAccessoryPickerResultNotFound:
+                    NSLog(@"NotFound");
+                    errorMessage = @"Unable to find that device!\n\nEnsure the device is powered on and that the blue LED is flashing.";
+                    break;
+                    
+                case EABluetoothAccessoryPickerResultCancelled:
+                    NSLog(@"Cancelled");
+                    break;
+                    
+                default:
+                    break;
+            }
+            if( errorMessage )
+            {
+                UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Pairing failed..."
+                                                                message:errorMessage
+                                                               delegate:nil
+                                                      cancelButtonTitle:@"OK"
+                                                      otherButtonTitles:nil
+                                      ];
+                [alert show];
+            }
+        }
+    }];
+}
+
+- (void)disconnectDevice:(CDVInvokedUrlCommand*)command {
+    if (_commander.isConnected) {
+        [_commander permanentlyDisconnect];
+        
+        _disconnectCallbackId = command.callbackId;
     }
+}
+
+- (void)getConnectedDeviceData:(CDVInvokedUrlCommand*)command {
+    TSLVersionInformationCommand * versionCommand = [TSLVersionInformationCommand synchronousCommand];
+    [_commander executeCommand:versionCommand];
+    TSLBatteryStatusCommand *batteryCommand = [TSLBatteryStatusCommand synchronousCommand];
+    [_commander executeCommand:batteryCommand];
     
-- (void)getConnectedDeviceData:(CDVInvokedUrlCommand*)command
+    NSString *msg = [NSString stringWithFormat:@"Manufacturer: %@\nSerial Number: %@\nFirmware: %@\nBattery Level: %@", versionCommand.manufacturer, versionCommand.serialNumber, versionCommand.firmwareVersion, [NSString stringWithFormat:@"%d%%", batteryCommand.batteryLevel]];
+    
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                      messageAsString:msg];
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:command.callbackId];
+    
+}
+
+
+- (void)scan:(CDVInvokedUrlCommand*)command {
+    
+    _scanCallbackId = command.callbackId;
+    
+    [_commander executeCommand:_inventaryCommand];
+    
+}
+
+- (void)initConnectedReader:(BOOL)isConnected {
+    if (isConnected) {
+        _inventaryCommand = [[TSLInventoryCommand alloc] init];
+        _inventaryCommand.transponderReceivedDelegate = self;
+        _inventaryCommand.captureNonLibraryResponses = YES;
+        _inventaryCommand.includeTransponderRSSI = TSL_TriState_YES;
+        [_commander addResponder:_inventaryCommand];
+        
+        
+        _readerCommand = [TSLReadTransponderCommand synchronousCommand];
+        _readerCommand.includeIndex = TSL_TriState_YES;
+        _readerCommand.accessPassword = 0;
+        _readerCommand.bank = TSL_DataBank_User;
+        [_commander addResponder:_readerCommand];
+    }
+}
+
+NSString *transponderReceivedMsg = @"EPC: ";
+
+- (void)transponderReceived:(NSString *)epc crc:(NSNumber *)crc pc:(NSNumber *)pc rssi:(NSNumber *)rssi fastId:(NSData *)fastId moreAvailable:(BOOL)moreAvailable {
+    
+    if (moreAvailable) {
+        NSString *s = [NSString stringWithFormat:@"%@\n", epc];
+        transponderReceivedMsg = [transponderReceivedMsg stringByAppendingString:s];
+    } else {
+        transponderReceivedMsg = [transponderReceivedMsg stringByAppendingString:epc];
+        
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                          messageAsString:transponderReceivedMsg];
+        [pluginResult setKeepCallbackAsBool:TRUE];
+        [self.commandDelegate sendPluginResult:pluginResult
+                                    callbackId:_scanCallbackId];
+        
+        transponderReceivedMsg = @"EPC: ";
+    }
+}
+
+
+
+
+NSString *scanAndReadMsg = @"Responses:\n\n";
+
+- (void)scanAndRead:(CDVInvokedUrlCommand*)command {
+    
+    _readerCommand.transponderDataReceivedBlock = ^(TSLTransponderData * transponder, BOOL moreAvailable)
     {
-        TSLVersionInformationCommand * versionCommand = [TSLVersionInformationCommand synchronousCommand];
-        [_commander executeCommand:versionCommand];
-        TSLBatteryStatusCommand *batteryCommand = [TSLBatteryStatusCommand synchronousCommand];
-        [_commander executeCommand:batteryCommand];
-        
-        NSString *msg = [NSString stringWithFormat:@"Manufacturer: %@\nSerial Number: %@\nFirmware: %@\nBattery Level: %@", versionCommand.manufacturer, versionCommand.serialNumber, versionCommand.firmwareVersion, [NSString stringWithFormat:@"%d%%", batteryCommand.batteryLevel]];
-        
-        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:msg                                 message:@""
-                                                       delegate:nil
-                                              cancelButtonTitle:@"OK"
-                                              otherButtonTitles:nil
-                              ];
-        [alert show];
-        
-    }
+        if (moreAvailable) {
+            NSString *epcString = [NSString stringWithFormat:@"EPC: %@\n", transponder.epc];
+            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:epcString];
+            
+            
+            NSString *indexString = [NSString stringWithFormat:@"Index: %@\n", transponder.index];
+            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:indexString];
+            
+            if (transponder.readData != nil) {
+                NSString *readDataString = [NSString stringWithFormat:@"Data: %@\n\n", [TSLBinaryEncoding toBase16String:transponder.readData]];
+                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
+            } else {
+                NSString *readDataString = [NSString stringWithFormat:@"Data: No data!", [TSLBinaryEncoding toBase16String:transponder.readData]];
+                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
+            }
+        } else {
+            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:transponder.epc];
+            
+            NSString *indexString = [NSString stringWithFormat:@"Index: %@\n", transponder.index];
+            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:indexString];
+            
+            if (transponder.readData != nil) {
+                NSString *readDataString = [NSString stringWithFormat:@"Data: %@\n\n", [TSLBinaryEncoding toBase16String:transponder.readData]];
+                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
+            } else {
+                NSString *readDataString = [NSString stringWithFormat:@"Data: No data!", [TSLBinaryEncoding toBase16String:transponder.readData]];
+                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
+            }
+            
+            
+            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                              messageAsString:scanAndReadMsg];
+            [pluginResult setKeepCallbackAsBool:TRUE];
+            [self.commandDelegate sendPluginResult:pluginResult
+                                        callbackId:command.callbackId];
+            
+            scanAndReadMsg = @"Responses:\n\n";
+        }
+    };
     
-    @end
+    // Execute the command
+    [_commander executeCommand:_readerCommand];
+    
+    
+}
+@end
