@@ -11,6 +11,8 @@
 - (void)scan:(CDVInvokedUrlCommand*)command;
 - (void)scanAndRead:(CDVInvokedUrlCommand*)command;
 
+- (void)writeTransponder:(CDVInvokedUrlCommand*)command;
+
 - (void)initConnectedReader:(BOOL) isConnected;
 
 @end

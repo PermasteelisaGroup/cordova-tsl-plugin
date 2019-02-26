@@ -69,10 +69,13 @@
     TSLInventoryCommand *_inventaryCommand;
     
     TSLReadTransponderCommand *_readerCommand;
+    TSLWriteTransponderCommand *_writeCommand;
     
     NSString *_connectCallbackId;
     NSString *_disconnectCallbackId;
     NSString *_scanCallbackId;
+    
+    NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersRead;
     
 }
 @end
@@ -260,10 +263,17 @@
 
 - (void)initConnectedReader:(BOOL)isConnected {
     if (isConnected) {
+        
+        // No information is returned by the reset command
+        TSLFactoryDefaultsCommand * resetCommand = [TSLFactoryDefaultsCommand synchronousCommand];
+        [_commander executeCommand:resetCommand];
+        
+        
         _inventaryCommand = [[TSLInventoryCommand alloc] init];
         _inventaryCommand.transponderReceivedDelegate = self;
         _inventaryCommand.captureNonLibraryResponses = YES;
         _inventaryCommand.includeTransponderRSSI = TSL_TriState_YES;
+        _inventaryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
         [_commander addResponder:_inventaryCommand];
         
         
@@ -271,7 +281,14 @@
         _readerCommand.includeIndex = TSL_TriState_YES;
         _readerCommand.accessPassword = 0;
         _readerCommand.bank = TSL_DataBank_User;
+        _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
         [_commander addResponder:_readerCommand];
+        
+        
+        _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
+        _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
+        [_commander addResponder:_writeCommand];
+        
     }
 }
 
@@ -298,55 +315,196 @@ NSString *transponderReceivedMsg = @"EPC: ";
 
 
 
-NSString *scanAndReadMsg = @"Responses:\n\n";
+NSString *scanAndReadMsg = @"";
 
 - (void)scanAndRead:(CDVInvokedUrlCommand*)command {
     
+    NSString* transponderIdentifier = [command.arguments objectAtIndex:0];
+    if (transponderIdentifier.length != 0) {
+        _readerCommand.selectBank = TSL_DataBank_ElectronicProductCode;
+        _readerCommand.selectData = transponderIdentifier;
+        _readerCommand.selectOffset = 32;                                      // This offset is in bits
+        _readerCommand.selectLength = (int)transponderIdentifier.length * 4;  // This length is in bits
+    }
+    
     _readerCommand.transponderDataReceivedBlock = ^(TSLTransponderData * transponder, BOOL moreAvailable)
     {
-        if (moreAvailable) {
-            NSString *epcString = [NSString stringWithFormat:@"EPC: %@\n", transponder.epc];
-            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:epcString];
-            
-            
-            NSString *indexString = [NSString stringWithFormat:@"Index: %@\n", transponder.index];
-            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:indexString];
-            
-            if (transponder.readData != nil) {
-                NSString *readDataString = [NSString stringWithFormat:@"Data: %@\n\n", [TSLBinaryEncoding toBase16String:transponder.readData]];
-                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
-            } else {
-                NSString *readDataString = [NSString stringWithFormat:@"Data: No data!", [TSLBinaryEncoding toBase16String:transponder.readData]];
-                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
-            }
-        } else {
-            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:transponder.epc];
-            
-            NSString *indexString = [NSString stringWithFormat:@"Index: %@\n", transponder.index];
-            scanAndReadMsg = [scanAndReadMsg stringByAppendingString:indexString];
-            
-            if (transponder.readData != nil) {
-                NSString *readDataString = [NSString stringWithFormat:@"Data: %@\n\n", [TSLBinaryEncoding toBase16String:transponder.readData]];
-                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
-            } else {
-                NSString *readDataString = [NSString stringWithFormat:@"Data: No data!", [TSLBinaryEncoding toBase16String:transponder.readData]];
-                scanAndReadMsg = [scanAndReadMsg stringByAppendingString:readDataString];
-            }
-            
-            
-            CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                              messageAsString:scanAndReadMsg];
-            [pluginResult setKeepCallbackAsBool:TRUE];
-            [self.commandDelegate sendPluginResult:pluginResult
-                                        callbackId:command.callbackId];
-            
-            scanAndReadMsg = @"Responses:\n\n";
+        if( transponder.epc != nil )
+        {
+            [_transpondersRead setObject:transponder forKey:transponder.epc];
         }
     };
+    
+    // Collect the responses in a dictionary
+    _transpondersRead = [NSMutableDictionary<NSString *, TSLTransponderData *> dictionary];
     
     // Execute the command
     [_commander executeCommand:_readerCommand];
     
+    // Display the data returned
+    if( _transpondersRead.count == 0 ) {
+        scanAndReadMsg= [scanAndReadMsg stringByAppendingString:@"No transponders responded\n\n"];
+    } else {
+        scanAndReadMsg = [scanAndReadMsg stringByAppendingString:@"Responses:\n\n"];
+        
+        // There can be more than one response in the dictionary
+        for( TSLTransponderData *transponder in [_transpondersRead objectEnumerator] ) {
+            
+            scanAndReadMsg = [scanAndReadMsg stringByAppendingFormat:@"EPC: %@\n", transponder.epc];
+            scanAndReadMsg = [scanAndReadMsg stringByAppendingFormat:@"Index: %@\n", transponder.index == nil ? @"?" : transponder.index];
+            
+            // Display the data returned
+            if( transponder.readData != nil ) {
+                
+                if( transponder.readData.length != 0 ) {
+                    scanAndReadMsg = [scanAndReadMsg stringByAppendingFormat:@"Data: %@\n\n", [TSLBinaryEncoding asciiStringFromData:transponder.readData]];
+                } else {
+                    scanAndReadMsg = [scanAndReadMsg stringByAppendingString:@"No data returned\n\n"];
+                }
+                
+            } else {
+                NSLog(@"No data for transponder: %@", transponder.epc);
+            }
+            
+            // Report any errors
+            if( transponder.accessErrorCode != TSL_TransponderAccessErrorCode_NotSpecified )
+            {
+                scanAndReadMsg = [scanAndReadMsg stringByAppendingFormat:@"EA: %03d\n%@\n\n",
+                                  transponder.accessErrorCode,
+                                  [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode]];
+            }
+            if( transponder.backscatterErrorCode != TSL_TransponderBackscatterErrorCode_NotSpecified )
+            {
+                scanAndReadMsg = [scanAndReadMsg stringByAppendingFormat:@"EB: %03d\n%@\n\n",
+                                  transponder.backscatterErrorCode,
+                                  [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode]];
+            }
+        }
+    }
+    
+    
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                      messageAsString:scanAndReadMsg];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:command.callbackId];
+    
+    scanAndReadMsg = @"";
     
 }
+
+
+- (void)writeTransponder:(CDVInvokedUrlCommand*)command {
+    
+    CDVPluginResult* pluginResult = nil;
+    __block NSString *transponderDetailsMessage = @"";
+    
+    @try
+    {
+        
+        //
+        // Configure the command
+        //
+        
+        // Use the select parameters to write to a single tag
+        // Set the match pattern to the full EPC
+        NSString* transponderIdentifier = [command.arguments objectAtIndex:0];
+        if (transponderIdentifier.length != 0) {
+            _writeCommand.selectData = transponderIdentifier;
+            _writeCommand.selectLength = (int)transponderIdentifier.length * 4;   // This length is in bits
+            _writeCommand.selectBank = TSL_DataBank_ElectronicProductCode;
+            
+            _writeCommand.selectOffset = 32;                                  // This offset is in bits
+        }
+        
+        
+        
+        // This demo only works with open tags
+        _writeCommand.accessPassword = 0;
+        
+        
+        int transponderBankMemory = [[command.arguments objectAtIndex:1] intValue];
+        
+        // Set the bank to be used
+        _writeCommand.bank = transponderBankMemory;
+        
+        //        // Set the data to be written
+        NSString* data = [command.arguments objectAtIndex:2];
+        //        if (data.length % 2 != 0) {
+        //            data = [data stringByAppendingString:@"\0"];
+        //        }
+        
+        if (data.length < 64) {
+            NSUInteger dif = 64 - data.length;
+            for (int i = 0; i < dif; i++) {
+                data = [data stringByAppendingString:@"\0"];
+            }
+        }
+        NSData* hexData = [TSLBinaryEncoding dataFromAsciiString:data];
+        
+        
+        _writeCommand.data = hexData;
+        
+        // Set the locations to write to - this demo writes all the data supplied
+        int offset = [[command.arguments objectAtIndex:3] intValue];
+        _writeCommand.offset = offset;
+        //    int length = [[command.arguments objectAtIndex:4] intValue];
+        _writeCommand.length = _writeCommand.data.length / 2;       // This length is in words
+        
+        
+        //
+        // Use the TransponderDataReceivedBlock to listen for each transponder - there may be more than one that can match
+        // the given EPC - often new tags are supplied with the same EPC
+        //
+        _writeCommand.transponderDataReceivedBlock = ^(TSLTransponderData * transponder, BOOL moreAvailable)
+        {
+            if( transponder.epc != nil )
+            {
+                transponderDetailsMessage = [transponderDetailsMessage stringByAppendingString:
+                                             [NSString stringWithFormat:@"%-6s%@\n",
+                                              "EPC:", transponder.epc
+                                              ]
+                                             ];
+            }
+            if( transponder.wordsWritten != nil )
+            {
+                transponderDetailsMessage = [transponderDetailsMessage stringByAppendingString:
+                                             [NSString stringWithFormat:@"%-16s%@\n",
+                                              "Words written:", transponder.wordsWritten
+                                              ]
+                                             ];
+            }
+        };
+        
+        // Execute the command
+        [_commander executeCommand:_writeCommand];
+        
+        // Display the outcome of the
+        if( _writeCommand.isSuccessful )
+        {
+            transponderDetailsMessage = [transponderDetailsMessage stringByAppendingString:@"Data written successfully\n\n"];
+        }
+        else
+        {
+            transponderDetailsMessage = [transponderDetailsMessage stringByAppendingString:@"Data write FAILED:\n"];
+            for (NSString *msg in _writeCommand.messages)
+            {
+                transponderDetailsMessage = [transponderDetailsMessage stringByAppendingFormat:@"%@\n", msg];
+            }
+        }
+    }
+    
+    @catch (NSException *exception)
+    {
+        transponderDetailsMessage = [transponderDetailsMessage stringByAppendingFormat:@"Exception: %@\n\n", exception.reason];
+    }
+    
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                     messageAsString:transponderDetailsMessage];
+    
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:command.callbackId];
+    
+}
+
 @end

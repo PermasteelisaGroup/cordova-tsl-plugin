@@ -27,3 +27,7 @@ exports.scan = function(arg0, success, error) {
 exports.scanAndRead = function(arg0, success, error) {
     exec(success, error, 'RFIDPlugin', 'scanAndRead', [arg0]);
 };
+
+exports.writeTransponder = function(arg0, arg1, arg2, arg3, arg4, success, error) {
+    exec(success, error, 'RFIDPlugin', 'writeTransponder', [arg0, arg1, arg2, arg3, arg4]);
+};
