@@ -719,7 +719,6 @@ NSString *scanAndReadMsg = @"";
         int transponderBankMemory = [[command.arguments objectAtIndex:1] intValue];
         NSString* data = [command.arguments objectAtIndex:2];
         int offset = [[command.arguments objectAtIndex:3] intValue];
-        int length = [[command.arguments objectAtIndex:4] intValue];
         
         // Set the bank to be used
         _writeCommand.bank = transponderBankMemory;
@@ -728,7 +727,7 @@ NSString *scanAndReadMsg = @"";
         _writeCommand.data = hexData;
         
         _writeCommand.offset = offset;
-        _writeCommand.length = length;
+        _writeCommand.length = (int)_writeCommand.data.length / 2;
         
         _writeCommand.transponderDataReceivedBlock = ^(TSLTransponderData * transponder, BOOL moreAvailable)
         {
