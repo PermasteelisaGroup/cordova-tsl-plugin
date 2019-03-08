@@ -19,6 +19,8 @@
 - (void)lock:(CDVInvokedUrlCommand*)command;
 
 - (void)alert:(CDVInvokedUrlCommand*)command;
+- (void)changeInventorySession:(CDVInvokedUrlCommand*)command;
+- (void)changeVibrationForCommand:(CDVInvokedUrlCommand*)command;
 
 - (void)initConnectedReader:(BOOL) isConnected;
 

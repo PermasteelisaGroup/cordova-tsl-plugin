@@ -82,6 +82,8 @@
     NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersRead;
     NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersWritten;
     
+    TSL_QuerySession *inventorySession;
+    
 }
 @end
 
@@ -273,8 +275,13 @@
         _inventaryCommand.transponderReceivedDelegate = self;
         _inventaryCommand.captureNonLibraryResponses = YES;
         _inventaryCommand.includeTransponderRSSI = TSL_TriState_YES;
-        //        _inventaryCommand.querySession = TSL_QuerySession_S0;
+        
+        if (inventorySession != nil) {
+            _inventaryCommand.querySession = inventorySession;
+        }
+        
         //        _inventaryCommand.useAlert = TSL_TriState_NO;
+        
         _inventaryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
         [_commander addResponder:_inventaryCommand];
         
@@ -811,6 +818,24 @@ NSMutableArray *epcArray;
     
 }
 
+- (void)changeInventorySession:(CDVInvokedUrlCommand*)command {
+    int querySession = [[command.arguments objectAtIndex:0] intValue];
+    _inventaryCommand.querySession = querySession;
+}
+
+
+- (void)changeVibrationForCommand:(CDVInvokedUrlCommand*)command {
+    int commandSelected = [[command.arguments objectAtIndex:0] intValue];
+    int status = [[command.arguments objectAtIndex:1] intValue];
+    if (commandSelected == 0) {
+        _inventaryCommand.useAlert = status;
+    } else if (commandSelected == 1) {
+        _readerCommand.useAlert = status;
+    } else if (commandSelected == 2) {
+        _writeCommand.useAlert = status;
+    }
+}
+
 
 
 
@@ -940,4 +965,5 @@ NSMutableArray *epcArray;
 }
 
 @end
+
 

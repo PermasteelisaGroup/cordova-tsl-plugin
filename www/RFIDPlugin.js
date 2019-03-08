@@ -50,3 +50,11 @@ exports.lock = function(transponderIdentifier, lockPayload, accessPassword, succ
 exports.alert = function(duration, enableBuzzer, enableVibration, tone, success, error) {
     exec(success, error, 'RFIDPlugin', 'alert', [duration, enableBuzzer, enableVibration, tone]);
 };
+
+exports.changeInventorySession = function(querySession, success, error) {
+    exec(success, error, 'RFIDPlugin', 'changeInventorySession', [querySession]);
+};
+
+exports.changeVibrationForCommand = function(commandSelected, status, success, error) {
+    exec(success, error, 'RFIDPlugin', 'changeVibrationForCommand', [commandSelected, status]);
+};
