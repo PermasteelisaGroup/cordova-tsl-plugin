@@ -16,6 +16,10 @@
 - (void)customScanAndRead:(CDVInvokedUrlCommand*)command;
 - (void)customWriteTransponder:(CDVInvokedUrlCommand*)command;
 
+- (void)lock:(CDVInvokedUrlCommand*)command;
+
+- (void)alert:(CDVInvokedUrlCommand*)command;
+
 - (void)initConnectedReader:(BOOL) isConnected;
 
 @end
