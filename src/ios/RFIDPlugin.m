@@ -411,7 +411,9 @@ NSMutableArray *epcArray;
                                           @"index" : transponder.index,
                                           @"data" : readDataDictionary,
                                           @"accessError" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
-                                          @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode]
+                                          @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode],
+                                          @"accessErrorCode" : [NSNumber numberWithInt:transponder.accessErrorCode],
+                                          @"backscatterErrorCode" : [NSNumber numberWithInt:transponder.backscatterErrorCode]
                                           };
         [transpondersArray addObject:transponderDict];
     }
@@ -539,9 +541,11 @@ NSMutableArray *epcArray;
             NSDictionary *transponderDict = @{
                                               @"epc" : transponder.epc,
                                               @"index" : transponder.index,
-                                              @"error" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
+                                              @"accessError" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
                                               @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode],
-                                              @"wordsWritten" : transponder.wordsWritten
+                                              @"wordsWritten" : transponder.wordsWritten,
+                                              @"accessErrorCode" : [NSNumber numberWithInt:transponder.accessErrorCode],
+                                              @"backscatterErrorCode" : [NSNumber numberWithInt:transponder.backscatterErrorCode]
                                               };
             [transpondersArray addObject:transponderDict];
         }
@@ -692,7 +696,9 @@ NSMutableArray *epcArray;
                                           @"index" : transponder.index,
                                           @"data" : readDataDictionary,
                                           @"accessError" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
-                                          @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode]
+                                          @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode],
+                                          @"accessErrorCode" : [NSNumber numberWithInt:transponder.accessErrorCode],
+                                          @"backscatterErrorCode" : [NSNumber numberWithInt:transponder.backscatterErrorCode]
                                           };
         [transpondersArray addObject:transponderDict];
     }
@@ -764,9 +770,11 @@ NSMutableArray *epcArray;
             NSDictionary *transponderDict = @{
                                               @"epc" : transponder.epc,
                                               @"index" : transponder.index,
-                                              @"error" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
+                                              @"wordsWritten" : transponder.wordsWritten,
+                                              @"accessError" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
                                               @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode],
-                                              @"wordsWritten" : transponder.wordsWritten
+                                              @"accessErrorCode" : [NSNumber numberWithInt:transponder.accessErrorCode],
+                                              @"backscatterErrorCode" : [NSNumber numberWithInt:transponder.backscatterErrorCode]
                                               };
             [transpondersArray addObject:transponderDict];
         }
