@@ -3,9 +3,6 @@
 #import <ExternalAccessory/ExternalAccessory.h>
 #import <ExternalAccessory/EAAccessoryManager.h>
 
-//#import <TSLAsciiCommands/TSLAsciiCommands.h>
-//#import <TSLAsciiCommands/TSLBinaryEncoding.h>
-
 // Helpers
 #import <TSLAsciiCommands/TSLBinaryEncoding.h>
 #import <TSLAsciiCommands/TSLConstants.h>
@@ -82,8 +79,7 @@
     NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersRead;
     NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersWritten;
     
-    TSL_QuerySession *inventorySession;
-    
+    int *inventorySession;
     int *inventoryAlertStatus;
     int *readAlertStatus;
     int *writeAlertStatus;
@@ -128,7 +124,7 @@
     inventoryAlertStatus = [[command.arguments objectAtIndex:0] intValue];
     readAlertStatus = [[command.arguments objectAtIndex:1] intValue];
     writeAlertStatus = [[command.arguments objectAtIndex:2] intValue];
-    
+    inventorySession = [[command.arguments objectAtIndex:3] intValue];
     
     _commander = [[TSLAsciiCommander alloc] init];
     // Some synchronous commands will be used in the app
@@ -148,17 +144,6 @@
     
     
     [self initConnectedReader:_commander.isConnected];
-    
-    //    CDVPluginResult* pluginResult = nil;
-    //    if (_commander.isConnected) {
-    //        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-    //                                         messageAsString:@"Plugin ready, device is connected"];
-    //    } else {
-    //        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-    //                                         messageAsString:@"Plugin ready, no connected device"];
-    //    }
-    //    [self.commandDelegate sendPluginResult:pluginResult
-    //                                callbackId:command.callbackId];
     
 }
 
@@ -286,7 +271,7 @@
         _inventoryCommand.includeTransponderRSSI = TSL_TriState_YES;
         
         if (inventorySession != nil) {
-            _inventoryCommand.querySession = *(inventorySession);
+            _inventoryCommand.querySession = inventorySession;
         }
         _inventoryCommand.useAlert = inventoryAlertStatus;
         _inventoryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
@@ -645,8 +630,6 @@ NSMutableArray *epcArray;
 
 - (void)customScanAndRead:(CDVInvokedUrlCommand*)command {
     
-    _readerCommand.resetParameters = TSL_TriState_YES;
-    
     _readerCommand.includeIndex = TSL_TriState_YES;
     _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
     
@@ -981,6 +964,8 @@ NSMutableArray *epcArray;
 }
 
 @end
+
+
 
 
 

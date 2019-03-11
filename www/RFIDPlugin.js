@@ -16,8 +16,8 @@ exports.disconnectDevice = function(success, error) {
     exec(success, error, 'RFIDPlugin', 'disconnectDevice');
 };
 
-exports.initPlugin = function(inventoryAlertStatus, readAlertStatus, writeAlertStatus, success, error) {
-    exec(success, error, 'RFIDPlugin', 'initPlugin', [inventoryAlertStatus, readAlertStatus, writeAlertStatus]);
+exports.initPlugin = function(inventoryAlertStatus, readAlertStatus, writeAlertStatus, inventorySession, success, error) {
+    exec(success, error, 'RFIDPlugin', 'initPlugin', [inventoryAlertStatus, readAlertStatus, writeAlertStatus, inventorySession]);
 };
 
 exports.scan = function(success, error) {
