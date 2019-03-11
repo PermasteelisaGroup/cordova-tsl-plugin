@@ -141,8 +141,6 @@
     _commander = [[TSLAsciiCommander alloc] init];
     // Some synchronous commands will be used in the app
     [_commander addSynchronousResponder];
-    //    [_commander connect:nil];
-    
     if( !_commander.isConnected )
     {
         [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
@@ -297,11 +295,15 @@
         
         _readerCommand = [TSLReadTransponderCommand synchronousCommand];
         _readerCommand.useAlert = readAlertStatus;
+        _readerCommand.includeIndex = TSL_TriState_YES;
+        _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
         [_commander addResponder:_readerCommand];
         
         
         _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
         _writeCommand.useAlert = writeAlertStatus;
+        _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
+        _writeCommand.includeIndex = TSL_TriState_YES;
         [_commander addResponder:_writeCommand];
         
         
@@ -330,12 +332,6 @@ NSMutableArray *epcArray;
 }
 
 - (void)scanAndRead:(CDVInvokedUrlCommand*)command {
-    
-    //    _readerCommand = [TSLReadTransponderCommand synchronousCommand];
-    
-    //    _readerCommand.resetParameters = TSL_TriState_YES;
-    _readerCommand.includeIndex = TSL_TriState_YES;
-    _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
     
     NSString* transponderIdentifier = [command.arguments objectAtIndex:0];
     int transponderBankMemory = [[command.arguments objectAtIndex:1] intValue];
@@ -430,11 +426,6 @@ NSMutableArray *epcArray;
 }
 
 - (void)writeTransponder:(CDVInvokedUrlCommand*)command {
-    
-    //    _writeCommand.resetParameters = TSL_TriState_YES;
-    
-    _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
-    _writeCommand.includeIndex = TSL_TriState_YES;
     
     CDVPluginResult* pluginResult = nil;
     
@@ -568,7 +559,7 @@ NSMutableArray *epcArray;
     @catch (NSException *exception)
     {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-                                         messageAsString:[self jsonWithErrorMsg:[NSString stringWithFormat:@"Exception: %@", exception.reason]]];
+                                         messageAsString:[self jsonWithErrorMsg:exception.reason]];
     }
     
     [self.commandDelegate sendPluginResult:pluginResult
@@ -646,9 +637,6 @@ NSMutableArray *epcArray;
 
 
 - (void)customScanAndRead:(CDVInvokedUrlCommand*)command {
-    
-    _readerCommand.includeIndex = TSL_TriState_YES;
-    _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
     
     NSString* transponderIdentifier = [command.arguments objectAtIndex:0];
     int transponderBankMemory = [[command.arguments objectAtIndex:1] intValue];
@@ -795,7 +783,7 @@ NSMutableArray *epcArray;
     @catch (NSException *exception)
     {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-                                         messageAsString:[self jsonWithErrorMsg:[NSString stringWithFormat:@"Exception: %@\n\n", exception.reason]]];
+                                         messageAsString:[self jsonWithErrorMsg:exception.reason]];
     }
     
     [self.commandDelegate sendPluginResult:pluginResult
@@ -812,7 +800,6 @@ NSMutableArray *epcArray;
 - (void)alert:(CDVInvokedUrlCommand*)command {
     
     TSLAlertCommand *alertCommand = [TSLAlertCommand synchronousCommand];
-    
     
     int duration = [[command.arguments objectAtIndex:0] intValue];
     int enableBuzzer= [[command.arguments objectAtIndex:1] intValue];
@@ -1007,10 +994,4 @@ NSMutableArray *epcArray;
 }
 
 @end
-
-
-
-
-
-
 
