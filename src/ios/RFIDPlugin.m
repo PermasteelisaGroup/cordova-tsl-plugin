@@ -121,16 +121,6 @@
 
 
 - (void)initPlugin:(CDVInvokedUrlCommand*)command {
-    inventoryAlertStatus = [[command.arguments objectAtIndex:0] intValue];
-    readAlertStatus = [[command.arguments objectAtIndex:1] intValue];
-    writeAlertStatus = [[command.arguments objectAtIndex:2] intValue];
-    inventorySession = [[command.arguments objectAtIndex:3] intValue];
-    
-    _commander = [[TSLAsciiCommander alloc] init];
-    // Some synchronous commands will be used in the app
-    [_commander addSynchronousResponder];
-    [_commander connect:nil];
-    
     
     // Listen for accessory connect/disconnects
     [[EAAccessoryManager sharedAccessoryManager] registerForLocalNotifications];
@@ -143,6 +133,21 @@
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(commanderChangedState:) name:TSLCommanderStateChangedNotification object:_commander];
     
     
+    inventoryAlertStatus = [[command.arguments objectAtIndex:0] intValue];
+    readAlertStatus = [[command.arguments objectAtIndex:1] intValue];
+    writeAlertStatus = [[command.arguments objectAtIndex:2] intValue];
+    inventorySession = [[command.arguments objectAtIndex:3] intValue];
+    
+    _commander = [[TSLAsciiCommander alloc] init];
+    // Some synchronous commands will be used in the app
+    [_commander addSynchronousResponder];
+    //    [_commander connect:nil];
+    
+    if( !_commander.isConnected )
+    {
+        [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
+        
+    }
     [self initConnectedReader:_commander.isConnected];
     
 }
@@ -232,17 +237,29 @@
 }
 
 - (void)getConnectedDeviceData:(CDVInvokedUrlCommand*)command {
-    TSLVersionInformationCommand *versionCommand = [TSLVersionInformationCommand synchronousCommand];
-    [_commander executeCommand:versionCommand];
-    TSLBatteryStatusCommand *batteryCommand = [TSLBatteryStatusCommand synchronousCommand];
-    [_commander executeCommand:batteryCommand];
     
-    NSMutableDictionary *deviceInfoDictionary = [[NSMutableDictionary alloc] init];
-    [deviceInfoDictionary setObject:[self dictionaryWithPropertiesOfObject:versionCommand] forKey:@"deviceVersion"];
-    [deviceInfoDictionary setObject:[self dictionaryWithPropertiesOfObject:batteryCommand] forKey:@"battery"];
+    CDVPluginResult* pluginResult = nil;
     
-    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                      messageAsString:[self jsonFromDictionary: deviceInfoDictionary]];
+    @try {
+        TSLVersionInformationCommand *versionCommand = [TSLVersionInformationCommand synchronousCommand];
+        [_commander executeCommand:versionCommand];
+        TSLBatteryStatusCommand *batteryCommand = [TSLBatteryStatusCommand synchronousCommand];
+        [_commander executeCommand:batteryCommand];
+        
+        NSMutableDictionary *deviceInfoDictionary = [[NSMutableDictionary alloc] init];
+        [deviceInfoDictionary setObject:[self dictionaryWithPropertiesOfObject:versionCommand] forKey:@"deviceVersion"];
+        [deviceInfoDictionary setObject:[self dictionaryWithPropertiesOfObject:batteryCommand] forKey:@"battery"];
+        
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                         messageAsString:[self jsonFromDictionary: deviceInfoDictionary]];
+        
+    }
+    @catch (NSException *exception)
+    {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                         messageAsString:[self jsonWithErrorMsg: exception.reason]];
+    }
+    
     [self.commandDelegate sendPluginResult:pluginResult
                                 callbackId:command.callbackId];
     
@@ -544,14 +561,14 @@ NSMutableArray *epcArray;
             
         } else {
             pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-                                             messageAsString:@"Data write FAILED"];
+                                             messageAsString:[self jsonWithErrorMsg:@"Data write FAILED"]];
         }
     }
     
     @catch (NSException *exception)
     {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-                                         messageAsString:[NSString stringWithFormat:@"Exception: %@\n\n", exception.reason]];
+                                         messageAsString:[self jsonWithErrorMsg:[NSString stringWithFormat:@"Exception: %@", exception.reason]]];
     }
     
     [self.commandDelegate sendPluginResult:pluginResult
@@ -771,14 +788,14 @@ NSMutableArray *epcArray;
                                              messageAsString:[self jsonFromArray:@"transponders" array:transpondersArray]];
         } else {
             pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-                                             messageAsString:@"Data write FAILED"];
+                                             messageAsString:[self jsonWithErrorMsg:@"Data write FAILED"]];
         }
     }
     
     @catch (NSException *exception)
     {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-                                         messageAsString:[NSString stringWithFormat:@"Exception: %@\n\n", exception.reason]];
+                                         messageAsString:[self jsonWithErrorMsg:[NSString stringWithFormat:@"Exception: %@\n\n", exception.reason]]];
     }
     
     [self.commandDelegate sendPluginResult:pluginResult
@@ -963,7 +980,34 @@ NSMutableArray *epcArray;
     
 }
 
+
+- (NSString*) jsonWithErrorMsg:(NSString*)msg  {
+    
+    NSDictionary *dict = @{@"msg" : msg};
+    
+    NSError *error = nil;
+    NSData *json;
+    
+    // Dictionary convertable to JSON ?
+    if ([NSJSONSerialization isValidJSONObject:dict])
+    {
+        // Serialize the dictionary
+        json = [NSJSONSerialization dataWithJSONObject:dict options:NSJSONWritingPrettyPrinted error:&error];
+        
+        // If no errors, let's view the JSON
+        if (json != nil && error == nil)
+        {
+            NSString *jsonString = [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];
+            
+            NSLog(@"JSON: %@", jsonString);
+            return jsonString;
+        }
+    }
+    return @"";
+}
+
 @end
+
 
 
 
