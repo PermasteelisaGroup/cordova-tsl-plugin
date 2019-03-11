@@ -70,7 +70,7 @@
 @interface RFIDPlugin () <TSLInventoryCommandTransponderReceivedDelegate> {
     
     TSLAsciiCommander *_commander;
-    TSLInventoryCommand *_inventaryCommand;
+    TSLInventoryCommand *_inventoryCommand;
     
     TSLReadTransponderCommand *_readerCommand;
     TSLWriteTransponderCommand *_writeCommand;
@@ -83,6 +83,10 @@
     NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersWritten;
     
     TSL_QuerySession *inventorySession;
+    
+    int *inventoryAlertStatus;
+    int *readAlertStatus;
+    int *writeAlertStatus;
     
 }
 @end
@@ -121,6 +125,11 @@
 
 
 - (void)initPlugin:(CDVInvokedUrlCommand*)command {
+    inventoryAlertStatus = [[command.arguments objectAtIndex:0] intValue];
+    readAlertStatus = [[command.arguments objectAtIndex:1] intValue];
+    writeAlertStatus = [[command.arguments objectAtIndex:2] intValue];
+    
+    
     _commander = [[TSLAsciiCommander alloc] init];
     // Some synchronous commands will be used in the app
     [_commander addSynchronousResponder];
@@ -238,7 +247,7 @@
 }
 
 - (void)getConnectedDeviceData:(CDVInvokedUrlCommand*)command {
-    TSLVersionInformationCommand * versionCommand = [TSLVersionInformationCommand synchronousCommand];
+    TSLVersionInformationCommand *versionCommand = [TSLVersionInformationCommand synchronousCommand];
     [_commander executeCommand:versionCommand];
     TSLBatteryStatusCommand *batteryCommand = [TSLBatteryStatusCommand synchronousCommand];
     [_commander executeCommand:batteryCommand];
@@ -259,7 +268,7 @@
     
     _scanCallbackId = command.callbackId;
     
-    [_commander executeCommand:_inventaryCommand];
+    [_commander executeCommand:_inventoryCommand];
     
 }
 
@@ -271,27 +280,28 @@
         [_commander executeCommand:resetCommand];
         
         
-        _inventaryCommand = [[TSLInventoryCommand alloc] init];
-        _inventaryCommand.transponderReceivedDelegate = self;
-        _inventaryCommand.captureNonLibraryResponses = YES;
-        _inventaryCommand.includeTransponderRSSI = TSL_TriState_YES;
+        _inventoryCommand = [[TSLInventoryCommand alloc] init];
+        _inventoryCommand.transponderReceivedDelegate = self;
+        _inventoryCommand.captureNonLibraryResponses = YES;
+        _inventoryCommand.includeTransponderRSSI = TSL_TriState_YES;
         
         if (inventorySession != nil) {
-            _inventaryCommand.querySession = inventorySession;
+            _inventoryCommand.querySession = *(inventorySession);
         }
-        
-        //        _inventaryCommand.useAlert = TSL_TriState_NO;
-        
-        _inventaryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
-        [_commander addResponder:_inventaryCommand];
+        _inventoryCommand.useAlert = inventoryAlertStatus;
+        _inventoryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
+        [_commander addResponder:_inventoryCommand];
         
         
         _readerCommand = [TSLReadTransponderCommand synchronousCommand];
+        _readerCommand.useAlert = readAlertStatus;
         [_commander addResponder:_readerCommand];
         
         
         _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
+        _writeCommand.useAlert = writeAlertStatus;
         [_commander addResponder:_writeCommand];
+        
         
     }
 }
@@ -319,9 +329,9 @@ NSMutableArray *epcArray;
 
 - (void)scanAndRead:(CDVInvokedUrlCommand*)command {
     
-    _readerCommand = [TSLReadTransponderCommand synchronousCommand];
+    //    _readerCommand = [TSLReadTransponderCommand synchronousCommand];
     
-    _readerCommand.resetParameters = TSL_TriState_YES;
+    //    _readerCommand.resetParameters = TSL_TriState_YES;
     _readerCommand.includeIndex = TSL_TriState_YES;
     _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
     
@@ -419,7 +429,7 @@ NSMutableArray *epcArray;
 
 - (void)writeTransponder:(CDVInvokedUrlCommand*)command {
     
-    _writeCommand.resetParameters = TSL_TriState_YES;
+    //    _writeCommand.resetParameters = TSL_TriState_YES;
     
     _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
     _writeCommand.includeIndex = TSL_TriState_YES;
@@ -816,11 +826,16 @@ NSMutableArray *epcArray;
     
     [_commander executeCommand:alertCommand];
     
+    // No information is returned by the reset command
+    TSLFactoryDefaultsCommand * resetCommand = [TSLFactoryDefaultsCommand synchronousCommand];
+    [_commander executeCommand:resetCommand];
+    
 }
 
 - (void)changeInventorySession:(CDVInvokedUrlCommand*)command {
     int querySession = [[command.arguments objectAtIndex:0] intValue];
-    _inventaryCommand.querySession = querySession;
+    _inventoryCommand.querySession = querySession;
+    [_commander executeCommand:_inventoryCommand];
 }
 
 
@@ -828,7 +843,8 @@ NSMutableArray *epcArray;
     int commandSelected = [[command.arguments objectAtIndex:0] intValue];
     int status = [[command.arguments objectAtIndex:1] intValue];
     if (commandSelected == 0) {
-        _inventaryCommand.useAlert = status;
+        _inventoryCommand.useAlert = status;
+        [_commander executeCommand:_inventoryCommand];
     } else if (commandSelected == 1) {
         _readerCommand.useAlert = status;
     } else if (commandSelected == 2) {
@@ -965,5 +981,7 @@ NSMutableArray *epcArray;
 }
 
 @end
+
+
 
 
