@@ -231,6 +231,11 @@
         [_commander permanentlyDisconnect];
         
         _disconnectCallbackId = command.callbackId;
+    } else {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                                          messageAsString:[self jsonWithErrorMsg: @"Reader not connected"]];
+        [self.commandDelegate sendPluginResult:pluginResult
+                                    callbackId:command.callbackId];
     }
 }
 
@@ -265,11 +270,16 @@
 
 
 - (void)scan:(CDVInvokedUrlCommand*)command {
-    
-    _scanCallbackId = command.callbackId;
-    
-    [_commander executeCommand:_inventoryCommand];
-    
+    if (_commander.isConnected) {
+        _scanCallbackId = command.callbackId;
+        
+        [_commander executeCommand:_inventoryCommand];
+    } else {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                                          messageAsString:[self jsonWithErrorMsg: @"Reader not connected"]];
+        [self.commandDelegate sendPluginResult:pluginResult
+                                    callbackId:command.callbackId];
+    }
 }
 
 - (void)initConnectedReader:(BOOL)isConnected {
@@ -333,95 +343,106 @@ NSMutableArray *epcArray;
 
 - (void)scanAndRead:(CDVInvokedUrlCommand*)command {
     
-    NSString* transponderIdentifier = [command.arguments objectAtIndex:0];
-    int transponderBankMemory = [[command.arguments objectAtIndex:1] intValue];
-    BOOL isEPCRead = [[command.arguments objectAtIndex:2] boolValue];
-    BOOL isPasswordRead = [[command.arguments objectAtIndex:3] boolValue];
-    NSString* accessPassword = [command.arguments objectAtIndex:4];
-    int epcMemoryLength = [[command.arguments objectAtIndex:5] intValue];
-    int userMemoryLength = [[command.arguments objectAtIndex:6] intValue];
-    
-    if (accessPassword.length != 0) {
-        _readerCommand.accessPassword = accessPassword;
-    } else {
-        _readerCommand.accessPassword = 0;
-    }
-    
-    _readerCommand.bank = transponderBankMemory;
-    
-    if (transponderBankMemory == TSL_DataBank_ElectronicProductCode) {
-        if (isEPCRead) {
-            _readerCommand.offset = 2;
-            _readerCommand.length = epcMemoryLength/16;
-        } else {
-            _readerCommand.offset = 1;
-            _readerCommand.length = 1;
-        }
-    } else if (transponderBankMemory == TSL_DataBank_TransponderIdentifier) {
-        _readerCommand.offset = 0;
-        _readerCommand.length = 8;
-    } else if (transponderBankMemory == TSL_DataBank_User) {
-        _readerCommand.offset = 0;
-        _readerCommand.length = userMemoryLength/16;
-    } else if (transponderBankMemory == TSL_DataBank_Reserved) {
-        if (isPasswordRead) {
-            _readerCommand.offset = 2;
-            _readerCommand.length = 2;
-        } else {
-            _readerCommand.offset = 0;
-            _readerCommand.length = 2;
-        }
-    }
-    
-    if (transponderIdentifier.length != 0) {
-        _readerCommand.selectBank = TSL_DataBank_ElectronicProductCode;
-        _readerCommand.selectData = transponderIdentifier;
-        _readerCommand.selectOffset = 32;                                      // This offset is in bits
-        _readerCommand.selectLength = (int)transponderIdentifier.length * 4;  // This length is in bits
-    }
-    
-    _readerCommand.transponderDataReceivedBlock = ^(TSLTransponderData * transponder, BOOL moreAvailable)
-    {
-        if( transponder.epc != nil )
-        {
-            [_transpondersRead setObject:transponder forKey:transponder.epc];
-        }
-    };
-    
-    // Collect the responses in a dictionary
-    _transpondersRead = [NSMutableDictionary<NSString *, TSLTransponderData *> dictionary];
-    
-    // Execute the command
-    [_commander executeCommand:_readerCommand];
-    
-    
-    NSMutableArray *transpondersArray = [NSMutableArray new];
-    
-    for( TSLTransponderData *transponder in [_transpondersRead objectEnumerator] )
-    {
-        NSDictionary *readDataDictionary = @{};
-        if (transponder.readData != nil) {
-            readDataDictionary = @{
-                                   @"hex" : [TSLBinaryEncoding toBase16String:transponder.readData],
-                                   @"ascii" : [TSLBinaryEncoding asciiStringFromData:transponder.readData]
-                                   };
-        }
-        NSDictionary *transponderDict = @{
-                                          @"epc" : transponder.epc,
-                                          @"index" : transponder.index,
-                                          @"data" : readDataDictionary,
-                                          @"accessError" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
-                                          @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode],
-                                          @"accessErrorCode" : [NSNumber numberWithInt:transponder.accessErrorCode],
-                                          @"backscatterErrorCode" : [NSNumber numberWithInt:transponder.backscatterErrorCode]
-                                          };
-        [transpondersArray addObject:transponderDict];
-    }
-    
     CDVPluginResult* pluginResult = nil;
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                     messageAsString:[self jsonFromArray:@"transponders" array:transpondersArray]];
-    [pluginResult setKeepCallbackAsBool:TRUE];
+    
+    @try {
+        
+        NSString* transponderIdentifier = [command.arguments objectAtIndex:0];
+        int transponderBankMemory = [[command.arguments objectAtIndex:1] intValue];
+        BOOL isEPCRead = [[command.arguments objectAtIndex:2] boolValue];
+        BOOL isPasswordRead = [[command.arguments objectAtIndex:3] boolValue];
+        NSString* accessPassword = [command.arguments objectAtIndex:4];
+        int epcMemoryLength = [[command.arguments objectAtIndex:5] intValue];
+        int userMemoryLength = [[command.arguments objectAtIndex:6] intValue];
+        
+        if (accessPassword.length != 0) {
+            _readerCommand.accessPassword = accessPassword;
+        } else {
+            _readerCommand.accessPassword = 0;
+        }
+        
+        _readerCommand.bank = transponderBankMemory;
+        
+        if (transponderBankMemory == TSL_DataBank_ElectronicProductCode) {
+            if (isEPCRead) {
+                _readerCommand.offset = 2;
+                _readerCommand.length = epcMemoryLength/16;
+            } else {
+                _readerCommand.offset = 1;
+                _readerCommand.length = 1;
+            }
+        } else if (transponderBankMemory == TSL_DataBank_TransponderIdentifier) {
+            _readerCommand.offset = 0;
+            _readerCommand.length = 8;
+        } else if (transponderBankMemory == TSL_DataBank_User) {
+            _readerCommand.offset = 0;
+            _readerCommand.length = userMemoryLength/16;
+        } else if (transponderBankMemory == TSL_DataBank_Reserved) {
+            if (isPasswordRead) {
+                _readerCommand.offset = 2;
+                _readerCommand.length = 2;
+            } else {
+                _readerCommand.offset = 0;
+                _readerCommand.length = 2;
+            }
+        }
+        
+        if (transponderIdentifier.length != 0) {
+            _readerCommand.selectBank = TSL_DataBank_ElectronicProductCode;
+            _readerCommand.selectData = transponderIdentifier;
+            _readerCommand.selectOffset = 32;                                      // This offset is in bits
+            _readerCommand.selectLength = (int)transponderIdentifier.length * 4;  // This length is in bits
+        }
+        
+        _readerCommand.transponderDataReceivedBlock = ^(TSLTransponderData * transponder, BOOL moreAvailable)
+        {
+            if( transponder.epc != nil )
+            {
+                [_transpondersRead setObject:transponder forKey:transponder.epc];
+            }
+        };
+        
+        // Collect the responses in a dictionary
+        _transpondersRead = [NSMutableDictionary<NSString *, TSLTransponderData *> dictionary];
+        
+        // Execute the command
+        [_commander executeCommand:_readerCommand];
+        
+        
+        NSMutableArray *transpondersArray = [NSMutableArray new];
+        
+        for( TSLTransponderData *transponder in [_transpondersRead objectEnumerator] )
+        {
+            NSDictionary *readDataDictionary = @{};
+            if (transponder.readData != nil) {
+                readDataDictionary = @{
+                                       @"hex" : [TSLBinaryEncoding toBase16String:transponder.readData],
+                                       @"ascii" : [TSLBinaryEncoding asciiStringFromData:transponder.readData]
+                                       };
+            }
+            NSDictionary *transponderDict = @{
+                                              @"epc" : transponder.epc,
+                                              @"index" : transponder.index,
+                                              @"data" : readDataDictionary,
+                                              @"accessError" : [TSLTransponderAccessErrorCode descriptionForTransponderAccessErrorCode: transponder.accessErrorCode],
+                                              @"backscatterError" : [TSLTransponderBackscatterErrorCode descriptionForTransponderBackscatterErrorCode: transponder.backscatterErrorCode],
+                                              @"accessErrorCode" : [NSNumber numberWithInt:transponder.accessErrorCode],
+                                              @"backscatterErrorCode" : [NSNumber numberWithInt:transponder.backscatterErrorCode]
+                                              };
+            [transpondersArray addObject:transponderDict];
+        }
+        
+        
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                         messageAsString:[self jsonFromArray:@"transponders" array:transpondersArray]];
+        [pluginResult setKeepCallbackAsBool:TRUE];
+        
+    }
+    @catch (NSException *exception) {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                         messageAsString:[self jsonWithErrorMsg:exception.reason]];
+    }
+    
     [self.commandDelegate sendPluginResult:pluginResult
                                 callbackId:command.callbackId];
     
@@ -807,24 +828,35 @@ NSMutableArray *epcArray;
 
 - (void)alert:(CDVInvokedUrlCommand*)command {
     
-    TSLAlertCommand *alertCommand = [TSLAlertCommand synchronousCommand];
+    CDVPluginResult* pluginResult = nil;
     
-    int duration = [[command.arguments objectAtIndex:0] intValue];
-    int enableBuzzer= [[command.arguments objectAtIndex:1] intValue];
-    int enableVibrator = [[command.arguments objectAtIndex:2] intValue];
-    int tone = [[command.arguments objectAtIndex:3] intValue];
+    @try {
+        TSLAlertCommand *alertCommand = [TSLAlertCommand synchronousCommand];
+        
+        int duration = [[command.arguments objectAtIndex:0] intValue];
+        int enableBuzzer= [[command.arguments objectAtIndex:1] intValue];
+        int enableVibrator = [[command.arguments objectAtIndex:2] intValue];
+        int tone = [[command.arguments objectAtIndex:3] intValue];
+        
+        alertCommand.duration = duration;
+        alertCommand.enableBuzzer = enableBuzzer;
+        alertCommand.enableVibrator = enableVibrator;
+        alertCommand.tone = tone;
+        
+        [_commander executeCommand:alertCommand];
+        
+        // No information is returned by the reset command
+        TSLFactoryDefaultsCommand * resetCommand = [TSLFactoryDefaultsCommand synchronousCommand];
+        [_commander executeCommand:resetCommand];
+    }
     
-    alertCommand.duration = duration;
-    alertCommand.enableBuzzer = enableBuzzer;
-    alertCommand.enableVibrator = enableVibrator;
-    alertCommand.tone = tone;
-    
-    [_commander executeCommand:alertCommand];
-    
-    // No information is returned by the reset command
-    TSLFactoryDefaultsCommand * resetCommand = [TSLFactoryDefaultsCommand synchronousCommand];
-    [_commander executeCommand:resetCommand];
-    
+    @catch (NSException *exception)
+    {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                         messageAsString:[self jsonWithErrorMsg:exception.reason]];
+        [self.commandDelegate sendPluginResult:pluginResult
+                                    callbackId:command.callbackId];
+    }
 }
 
 - (void)changeInventorySession:(CDVInvokedUrlCommand*)command {
@@ -1002,4 +1034,5 @@ NSMutableArray *epcArray;
 }
 
 @end
+
 
