@@ -4,7 +4,7 @@
     <js-module name="RFIDPlugin" src="www/RFIDPlugin.js">
         <clobbers target="rfidplugin" />
     </js-module>
-    
+    <description>RFID TSL plugin</description>
     <platform name="ios">
         <config-file target="config.xml" parent="/*">
             <feature name="RFIDPlugin">
