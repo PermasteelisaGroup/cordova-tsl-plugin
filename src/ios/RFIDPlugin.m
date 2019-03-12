@@ -468,6 +468,7 @@
         int epcMemoryLength = [[command.arguments objectAtIndex:6] intValue];
         int userMemoryLength = [[command.arguments objectAtIndex:7] intValue];
         
+        _writeCommand.resetParameters = TSL_TriState_YES;
         // Use the select parameters to write to a single tag
         // Set the match pattern to the full EPC
         if (transponderIdentifier.length != 0) {
@@ -580,8 +581,10 @@
                                              messageAsString:[self jsonFromArray:@"transponders" array:transpondersArray]];
             
         } else {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-                                             messageAsString:[self jsonWithErrorMsg:@"Data write FAILED"]];
+            for (NSString *msg in _writeCommand.messages) {
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                                 messageAsString:[self jsonWithErrorMsg:msg]];
+            }
         }
     }
     
@@ -751,6 +754,8 @@
         NSString* data = [command.arguments objectAtIndex:2];
         int offset = [[command.arguments objectAtIndex:3] intValue];
         NSString* accessPassword = [command.arguments objectAtIndex:4];
+        
+        _writeCommand.resetParameters = TSL_TriState_YES;
         
         if (transponderIdentifier.length != 0) {
             _writeCommand.selectData = transponderIdentifier;
