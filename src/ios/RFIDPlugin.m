@@ -184,18 +184,12 @@
         [_commander addResponder:_inventoryCommand];
         
         
-        _readerCommand = [TSLReadTransponderCommand synchronousCommand];
-        _readerCommand.useAlert = readAlertStatus;
-        _readerCommand.includeIndex = TSL_TriState_YES;
-        _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
-        [_commander addResponder:_readerCommand];
         
-        
-        _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
-        _writeCommand.useAlert = writeAlertStatus;
-        _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
-        _writeCommand.includeIndex = TSL_TriState_YES;
-        [_commander addResponder:_writeCommand];
+        //        _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
+        //        _writeCommand.useAlert = writeAlertStatus;
+        //        _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
+        //        _writeCommand.includeIndex = TSL_TriState_YES;
+        //        [_commander addResponder:_writeCommand];
         
         
     }
@@ -359,6 +353,14 @@
         int epcMemoryLength = [[command.arguments objectAtIndex:5] intValue];
         int userMemoryLength = [[command.arguments objectAtIndex:6] intValue];
         
+        _readerCommand = [TSLReadTransponderCommand synchronousCommand];
+        _readerCommand.useAlert = readAlertStatus;
+        _readerCommand.includeIndex = TSL_TriState_YES;
+        _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
+        [_commander addResponder:_readerCommand];
+        
+        _readerCommand.resetParameters = TSL_TriState_YES;
+        
         if (accessPassword.length != 0) {
             _readerCommand.accessPassword = accessPassword;
         } else {
@@ -467,6 +469,12 @@
         NSString* accessPassword = [command.arguments objectAtIndex:5];
         int epcMemoryLength = [[command.arguments objectAtIndex:6] intValue];
         int userMemoryLength = [[command.arguments objectAtIndex:7] intValue];
+        
+        _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
+        _writeCommand.useAlert = writeAlertStatus;
+        _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
+        _writeCommand.includeIndex = TSL_TriState_YES;
+        [_commander addResponder:_writeCommand];
         
         _writeCommand.resetParameters = TSL_TriState_YES;
         // Use the select parameters to write to a single tag
@@ -627,7 +635,9 @@
                 transpondersLocked = [[NSMutableArray alloc] init];
             }
             
-            [transpondersLocked addObject:transponder.epc];
+            if (transponder.didLock) {
+                [transpondersLocked addObject:transponder.epc];
+            }
             
             if (!moreAvailable) {
                 CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
@@ -671,6 +681,15 @@
         int offset = [[command.arguments objectAtIndex:2] intValue];
         int lenght = [[command.arguments objectAtIndex:3] intValue];
         NSString* accessPassword = [command.arguments objectAtIndex:4];
+        
+        
+        _readerCommand = [TSLReadTransponderCommand synchronousCommand];
+        _readerCommand.useAlert = readAlertStatus;
+        _readerCommand.includeIndex = TSL_TriState_YES;
+        _readerCommand.outputPower = [TSLReadTransponderCommand maximumOutputPower];
+        [_commander addResponder:_readerCommand];
+        
+        _readerCommand.resetParameters = TSL_TriState_YES;
         
         if (accessPassword.length != 0) {
             _readerCommand.accessPassword = accessPassword;
@@ -754,6 +773,12 @@
         NSString* data = [command.arguments objectAtIndex:2];
         int offset = [[command.arguments objectAtIndex:3] intValue];
         NSString* accessPassword = [command.arguments objectAtIndex:4];
+        
+        _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
+        _writeCommand.useAlert = writeAlertStatus;
+        _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
+        _writeCommand.includeIndex = TSL_TriState_YES;
+        [_commander addResponder:_writeCommand];
         
         _writeCommand.resetParameters = TSL_TriState_YES;
         
@@ -882,9 +907,9 @@
         _inventoryCommand.useAlert = status;
         [_commander executeCommand:_inventoryCommand];
     } else if (commandSelected == 1) {
-        _readerCommand.useAlert = status;
+        readAlertStatus = status;
     } else if (commandSelected == 2) {
-        _writeCommand.useAlert = status;
+        writeAlertStatus = status;
     }
 }
 
