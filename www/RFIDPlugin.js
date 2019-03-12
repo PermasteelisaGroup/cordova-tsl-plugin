@@ -24,7 +24,7 @@ exports.scan = function(success, error) {
     exec(success, error, 'RFIDPlugin', 'scan');
 };
 
-exports.scanAndRead = function(u, transponderBankMemory, isEPCRead, isPasswordRead, accessPassword, epcMemoryLength, userMemoryLength, success, error) {
+exports.scanAndRead = function(transponderIdentifier, transponderBankMemory, isEPCRead, isPasswordRead, accessPassword, epcMemoryLength, userMemoryLength, success, error) {
     exec(success, error, 'RFIDPlugin', 'scanAndRead', [transponderIdentifier, transponderBankMemory, isEPCRead, isPasswordRead, accessPassword, epcMemoryLength, userMemoryLength]);
 };
 
