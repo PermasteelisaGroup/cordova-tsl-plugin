@@ -87,6 +87,7 @@
     int *readAlertStatus;
     int *writeAlertStatus;
     
+    BOOL isInitialized;
 }
 @end
 
@@ -125,30 +126,44 @@
 
 - (void)initPlugin:(CDVInvokedUrlCommand*)command {
     
-    // Listen for accessory connect/disconnects
-    [[EAAccessoryManager sharedAccessoryManager] registerForLocalNotifications];
-    
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidConnect:) name:EAAccessoryDidConnectNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidDisconnect:) name:EAAccessoryDidDisconnectNotification object:nil];
-    
-    
-    // Listen for change in TSLAsciiCommander state
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(commanderChangedState:) name:TSLCommanderStateChangedNotification object:_commander];
-    
-    
     inventoryAlertStatus = [[command.arguments objectAtIndex:0] intValue];
     readAlertStatus = [[command.arguments objectAtIndex:1] intValue];
     writeAlertStatus = [[command.arguments objectAtIndex:2] intValue];
     inventorySession = [[command.arguments objectAtIndex:3] intValue];
     
-    _commander = [[TSLAsciiCommander alloc] init];
-    // Some synchronous commands will be used in the app
-    [_commander addSynchronousResponder];
-    if( !_commander.isConnected )
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidConnect:) name:EAAccessoryDidConnectNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_accessoryDidDisconnect:) name:EAAccessoryDidDisconnectNotification object:nil];
+    
+    
+    if(_commander.isConnected)
     {
-        [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
-        
+        // Stop any synchronous commands and tell the reader to abort
+        // This is to leave the reader in the best possible state for other Apps
+        @try
+        {
+            [_commander abortSynchronousCommand];
+            [_commander executeCommand:[TSLAbortCommand synchronousCommand]];
+            [_commander disconnect];
+        }
+        @catch (NSException *exception)
+        {
+            NSLog( @"Unable to disconnect when resigningActive: %@", exception.reason);
+        }
     }
+    
+    if (!isInitialized) {
+        isInitialized = YES;
+        // Listen for accessory connect/disconnects
+        [[EAAccessoryManager sharedAccessoryManager] registerForLocalNotifications];
+        
+        _commander = [[TSLAsciiCommander alloc] init];
+        // Some synchronous commands will be used in the app
+        [_commander addSynchronousResponder];
+    }
+    
+    // Listen for change in TSLAsciiCommander state
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(commanderChangedState:) name:TSLCommanderStateChangedNotification object:_commander];
+    
     [self initConnectedReader:_commander.isConnected];
     
 }
@@ -183,15 +198,11 @@
         _inventoryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
         [_commander addResponder:_inventoryCommand];
         
-        
-        
-        //        _writeCommand = [TSLWriteTransponderCommand synchronousCommand];
-        //        _writeCommand.useAlert = writeAlertStatus;
-        //        _writeCommand.outputPower = [TSLWriteTransponderCommand maximumOutputPower];
-        //        _writeCommand.includeIndex = TSL_TriState_YES;
-        //        [_commander addResponder:_writeCommand];
-        
-        
+    } else {
+        if( !_commander.isConnected )
+        {
+            [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
+        }
     }
 }
 
@@ -1068,5 +1079,6 @@
 }
 
 @end
+
 
 
