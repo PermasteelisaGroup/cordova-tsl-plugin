@@ -164,6 +164,13 @@
     // Listen for change in TSLAsciiCommander state
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(commanderChangedState:) name:TSLCommanderStateChangedNotification object:_commander];
     
+    if( !_commander.isConnected )
+    {
+        [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
+    } else {
+        [_commander connect:nil];
+    }
+    
     [self initConnectedReader:_commander.isConnected];
     
 }
@@ -198,11 +205,6 @@
         _inventoryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
         [_commander addResponder:_inventoryCommand];
         
-    } else {
-        if( !_commander.isConnected )
-        {
-            [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
-        }
     }
 }
 
