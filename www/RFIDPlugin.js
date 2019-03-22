@@ -46,6 +46,9 @@ exports.lock = function(transponderIdentifier, lockPayload, accessPassword, succ
     exec(success, error, 'RFIDPlugin', 'lock', [transponderIdentifier, lockPayload, accessPassword]);
 };
 
+exports.barcodeScan = function(success, error) {
+               exec(success, error, 'RFIDPlugin', 'barcodeScan');
+};
 
 exports.alert = function(duration, enableBuzzer, enableVibration, tone, success, error) {
     exec(success, error, 'RFIDPlugin', 'alert', [duration, enableBuzzer, enableVibration, tone]);
