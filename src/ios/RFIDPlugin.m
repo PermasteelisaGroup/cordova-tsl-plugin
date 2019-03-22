@@ -59,28 +59,30 @@
 // Protocols
 #import <TSLAsciiCommands/TSLAsciiCommandResponseNotifying.h>
 #import <TSLAsciiCommands/TSLTransponderReceivedDelegate.h>
-
+#import <TSLAsciiCommands/TSLAsciiCommandResponderDelegate.h>
 
 #import <objc/runtime.h>
 
 
-@interface RFIDPlugin () <TSLInventoryCommandTransponderReceivedDelegate> {
+@interface RFIDPlugin () <TSLInventoryCommandTransponderReceivedDelegate,TSLBarcodeCommandBarcodeReceivedDelegate> {
     
     TSLAsciiCommander *_commander;
     TSLInventoryCommand *_inventoryCommand;
-    
+    TSLBarcodeCommand *_barcodeCommand;
     TSLReadTransponderCommand *_readerCommand;
     TSLWriteTransponderCommand *_writeCommand;
     
     NSString *_connectCallbackId;
     NSString *_disconnectCallbackId;
     NSString *_scanCallbackId;
+    NSString *_scanBarcodeCallbackId;
     
     NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersRead;
     NSMutableDictionary<NSString *, TSLTransponderData *> *_transpondersWritten;
     
     NSMutableArray *transpondersScanned;
     NSMutableArray *transpondersLocked;
+    NSString *barcodeScanned;
     
     int *inventorySession;
     int *inventoryAlertStatus;
@@ -170,7 +172,6 @@
     } else {
         [_commander connect:nil];
     }
-    
     [self initConnectedReader:_commander.isConnected];
     
 }
@@ -204,6 +205,13 @@
         _inventoryCommand.useAlert = inventoryAlertStatus;
         _inventoryCommand.outputPower = [TSLInventoryCommand maximumOutputPower];
         [_commander addResponder:_inventoryCommand];
+        
+        _barcodeCommand = [[TSLBarcodeCommand alloc] init];
+        _barcodeCommand.barcodeReceivedDelegate = self;
+        _barcodeCommand.captureNonLibraryResponses = YES;
+        [_commander addResponder:_barcodeCommand];
+        
+    } else {
         
     }
 }
@@ -350,6 +358,22 @@
         transpondersScanned = [[NSMutableArray alloc] init];
         
     }
+}
+- (void)barcodeReceived:(NSString *)barcode{
+    if (barcodeScanned == nil) {
+        barcodeScanned = [[NSString alloc] init];
+    }
+    
+    barcodeScanned = barcode;
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+                                                      messageAsString:[self jsonWithMessage:@"value":barcodeScanned]];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    [self.commandDelegate sendPluginResult:pluginResult
+                                callbackId:_scanBarcodeCallbackId];
+    
+    barcodeScanned = [[NSString alloc] init];
+
+
 }
 
 - (void)scanAndRead:(CDVInvokedUrlCommand*)command {
@@ -870,13 +894,24 @@
 
 
 
-
+- (void) barcodeScan:(CDVInvokedUrlCommand*)command{
+    
+    if (_commander.isConnected) {
+        _scanBarcodeCallbackId = command.callbackId;
+        
+        [_commander executeCommand:_barcodeCommand];
+    } else {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                                          messageAsString:[self jsonWithErrorMsg: @"Reader not connected"]];
+        [self.commandDelegate sendPluginResult:pluginResult
+                                    callbackId:command.callbackId];
+    }
+}
 
 
 - (void)alert:(CDVInvokedUrlCommand*)command {
     
     CDVPluginResult* pluginResult = nil;
-    
     @try {
         TSLAlertCommand *alertCommand = [TSLAlertCommand synchronousCommand];
         
@@ -1058,6 +1093,31 @@
 - (NSString*) jsonWithErrorMsg:(NSString*)msg  {
     
     NSDictionary *dict = @{@"msg" : msg};
+    
+    NSError *error = nil;
+    NSData *json;
+    
+    // Dictionary convertable to JSON ?
+    if ([NSJSONSerialization isValidJSONObject:dict])
+    {
+        // Serialize the dictionary
+        json = [NSJSONSerialization dataWithJSONObject:dict options:NSJSONWritingPrettyPrinted error:&error];
+        
+        // If no errors, let's view the JSON
+        if (json != nil && error == nil)
+        {
+            NSString *jsonString = [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];
+            
+            NSLog(@"JSON: %@", jsonString);
+            return jsonString;
+        }
+    }
+    return @"";
+}
+
+- (NSString*) jsonWithMessage:(NSString*)key :(NSString*)value  {
+    
+    NSDictionary *dict = @{key : value};
     
     NSError *error = nil;
     NSData *json;

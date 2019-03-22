@@ -17,7 +17,7 @@
 - (void)customWriteTransponder:(CDVInvokedUrlCommand*)command;
 
 - (void)lock:(CDVInvokedUrlCommand*)command;
-
+- (void)barcodeScan:(CDVInvokedUrlCommand*)command;
 - (void)alert:(CDVInvokedUrlCommand*)command;
 - (void)changeInventorySession:(CDVInvokedUrlCommand*)command;
 - (void)changeVibrationForCommand:(CDVInvokedUrlCommand*)command;
