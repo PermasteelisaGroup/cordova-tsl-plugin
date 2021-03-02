@@ -168,7 +168,11 @@
     
     if( !_commander.isConnected )
     {
-        [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
+        NSArray* connectedAccessories = [[EAAccessoryManager sharedAccessoryManager] connectedAccessories];
+        if (connectedAccessories.count != 0) {
+            [_commander connect:[[EAAccessoryManager sharedAccessoryManager] connectedAccessories][0]];
+        }
+
     } else {
         [_commander connect:nil];
     }
